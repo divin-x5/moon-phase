@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Moon Phases — Today & Next 7 Days</title>
+  <style>
+    :root{
+      --bg: #0b1220;
+      --card:#111a2e;
+      --txt:#e8edf7;
+      --muted:#94a3b8;
+      --accent:#7dd3fc;
+      --ring: rgba(125, 211, 252, 0.35);
+    }
+    *{box-sizing:border-box}
+    body{margin:0;background: radial-gradient(1200px 600px at 10% 10%, #0e1a33, var(--bg)); color:var(--txt); font:16px/1.5 system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, 'Helvetica Neue', Arial, 'Apple Color Emoji','Segoe UI Emoji'; min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px}
+    .app{width:100%; max-width:1000px}
+    .card{background:linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02)); border:1px solid rgba(255,255,255,0.08); border-radius:20px; padding:20px; box-shadow:0 10px 30px rgba(0,0,0,0.35), inset 0 0 0 1px rgba(255,255,255,0.02)}
+    h1{margin:0 0 6px; font-size:26px; letter-spacing:.2px}
+    .sub{color:var(--muted); margin-bottom:20px}
+    .today{display:flex; gap:18px; align-items:center; padding:16px; border-radius:16px; background:rgba(125, 211, 252, 0.06); border:1px solid rgba(125, 211, 252, 0.18); box-shadow:0 0 0 6px var(--ring)}
+    .icon{font-size:64px; filter: drop-shadow(0 4px 18px rgba(125,211,252,.25));}
+    .meta{display:grid; gap:4px}
+    .meta .label{color:var(--muted); font-size:13px}
+    .meta .value{font-size:18px; font-weight:650}
+    .btn{appearance:none; border:1px solid rgba(255,255,255,.12); background:#0f1a2e; color:var(--txt); padding:10px 14px; border-radius:12px; cursor:pointer; font-weight:600}
+    .btn:hover{border-color:rgba(255,255,255,.25)}
+    .grid{display:grid; grid-template-columns:repeat(2, 1fr); gap:10px; margin-top:14px}
+    @media (min-width:720px){ .grid{ grid-template-columns:repeat(4, 1fr);} }
+    .tile{background:var(--card); border:1px solid rgba(255,255,255,.08); border-radius:14px; padding:12px; display:grid; place-items:center; gap:8px}
+    .tile .d{color:var(--muted); font-size:12px}
+    .tile .name{font-size:14px; text-align:center}
+    .foot{color:var(--muted); font-size:12px; margin-top:12px}
+    .legend{display:flex; gap:10px; flex-wrap:wrap; margin-top:10px; color:var(--muted); font-size:13px}
+    .legend span{display:inline-grid; grid-auto-flow:column; gap:6px; align-items:center; background:rgba(255,255,255,.04); padding:6px 8px; border-radius:999px; border:1px solid rgba(255,255,255,.08)}
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="card">
+      <h1>Moon Phases</h1>
+      <div class="sub">Today & the next 7 days — local time</div>
+      <div class="today" id="todayRow">
+        <div class="icon" id="todayIcon">🌔</div>
+        <div class="meta">
+          <div class="label">Today</div>
+          <div class="value" id="todayName">Waxing Gibbous</div>
+          <div class="label" id="todayDate">—</div>
+        </div>
+        <div style="margin-left:auto;display:flex;gap:10px;align-items:center">
+          <button class="btn" id="toggle">Next 7 Days</button>
+        </div>
+      </div>
+      <div id="grid" class="grid" style="display:none"></div>
+      <div class="legend">
+        <span>🌑 New</span><span>🌒 Waxing Crescent</span><span>🌓 First Quarter</span>
+        <span>🌔 Waxing Gibbous</span><span>🌕 Full</span><span>🌖 Waning Gibbous</span>
+        <span>🌗 Last Quarter</span><span>🌘 Waning Crescent</span>
+      </div>
+      <div class="foot">Icons are mapped to primary phase classes; calculations use a simplified synodic-month model anchored at 2000‑01‑06 18:14 UTC.</div>
+    </div>
+  </div>
+
+<script>
+// --- Moon phase utilities ---
+// Reference: New moon at 2000-01-06 18:14 UTC (Julian 2451550.1); synodic month = 29.53058867 d
+const SYNODIC = 29.53058867;
+const REF = Date.UTC(2000,0,6,18,14,0);
+function phaseInfo(date){
+  const days = (Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), date.getUTCHours(), date.getUTCMinutes(), date.getUTCSeconds()) - REF)/86400000;
+  let age = ((days % SYNODIC) + SYNODIC) % SYNODIC; // 0..29.53
+  const frac = age / SYNODIC; // 0..1
+  const illum = 0.5 * (1 - Math.cos(2*Math.PI*frac)); // illuminated fraction 0..1
+  const name = phaseName(frac);
+  const icon = phaseIcon(name);
+  return {age, frac, illum, name, icon};
+}
+function phaseName(frac){
+  if (frac < 0.0625 || frac >= 0.9375) return "New Moon";
+  if (frac < 0.1875) return "Waxing Crescent";
+  if (frac < 0.3125) return "First Quarter";
+  if (frac < 0.4375) return "Waxing Gibbous";
+  if (frac < 0.5625) return "Full Moon";
+  if (frac < 0.6875) return "Waning Gibbous";
+  if (frac < 0.8125) return "Last Quarter";
+  return "Waning Crescent";
+}
+function phaseIcon(name){
+  switch(name){
+    case "New Moon": return "🌑";
+    case "Waxing Crescent": return "🌒";
+    case "First Quarter": return "🌓";
+    case "Waxing Gibbous": return "🌔";
+    case "Full Moon": return "🌕";
+    case "Waning Gibbous": return "🌖";
+    case "Last Quarter": return "🌗";
+    case "Waning Crescent": return "🌘";
+    default: return "🌑";
+  }
+}
+function fmtDate(d){
+  return d.toLocaleString(undefined, {weekday:'short', year:'numeric', month:'short', day:'numeric'});
+}
+function addDays(base, n){
+  const d = new Date(base);
+  d.setDate(d.getDate()+n);
+  return d;
+}
+
+// --- Render today ---
+const today = new Date();
+const tInfo = phaseInfo(today);
+document.getElementById('todayIcon').textContent = tInfo.icon;
+document.getElementById('todayName').textContent = tInfo.name + ` — ${(tInfo.illum*100).toFixed(0)}% lit`;
+document.getElementById('todayDate').textContent = fmtDate(today);
+
+// --- Next 7 days grid ---
+const grid = document.getElementById('grid');
+for(let i=1;i<=7;i++){
+  const d = addDays(today,i);
+  const info = phaseInfo(d);
+  const tile = document.createElement('div');
+  tile.className = 'tile';
+  tile.innerHTML = `
+    <div class="icon" style="font-size:44px">${info.icon}</div>
+    <div class="name">${info.name}</div>
+    <div class="d">${fmtDate(d)} · ${(info.illum*100).toFixed(0)}% lit</div>
+  `;
+  grid.appendChild(tile);
+}
+
+// --- Toggle ---
+const toggle = document.getElementById('toggle');
+let open = false;
+toggle.addEventListener('click', () => {
+  open = !open;
+  grid.style.display = open ? 'grid' : 'none';
+  toggle.textContent = open ? 'Hide Next 7 Days' : 'Next 7 Days';
+});
+</script>
+</body>
+</html>
